@@ -50,34 +50,34 @@
 #include "LoRaMac-board.h"
 
 /*!
- * Beacon interval in us
+ * Beacon interval in ms
  */
-#define BEACON_INTERVAL                             128000000
+#define BEACON_INTERVAL                             128000
 
 /*!
- * Class A&B receive delay 1 in us
+ * Class A&B receive delay 1 in ms
  */
-#define RECEIVE_DELAY1                              1000000
+#define RECEIVE_DELAY1                              1000
 
 /*!
- * Class A&B receive delay 2 in us
+ * Class A&B receive delay 2 in ms
  */
-#define RECEIVE_DELAY2                              2000000
+#define RECEIVE_DELAY2                              2000
 
 /*!
- * Join accept receive delay 1 in us
+ * Join accept receive delay 1 in ms
  */
-#define JOIN_ACCEPT_DELAY1                          5000000
+#define JOIN_ACCEPT_DELAY1                          5000
 
 /*!
- * Join accept receive delay 2 in us
+ * Join accept receive delay 2 in ms
  */
-#define JOIN_ACCEPT_DELAY2                          6000000
+#define JOIN_ACCEPT_DELAY2                          6000
 
 /*!
- * Class A&B maximum receive window delay in us
+ * Class A&B maximum receive window delay in ms
  */
-#define MAX_RX_WINDOW                               3000000
+#define MAX_RX_WINDOW                               3000
 
 /*!
  * Maximum allowed gap for the FCNT field
@@ -99,19 +99,19 @@
  * receiving an acknowledge.
  * AckTimeout = \ref ACK_TIMEOUT + Random( -\ref ACK_TIMEOUT_RND, \ref ACK_TIMEOUT_RND )
  */
-#define ACK_TIMEOUT                                 2000000
+#define ACK_TIMEOUT                                 2000
 
 /*!
  * Random number of seconds after the start of the second reception window without
  * receiving an acknowledge
  * AckTimeout = \ref ACK_TIMEOUT + Random( -\ref ACK_TIMEOUT_RND, \ref ACK_TIMEOUT_RND )
  */
-#define ACK_TIMEOUT_RND                             1000000
+#define ACK_TIMEOUT_RND                             1000
 
 /*!
- * Check the Mac layer state every MAC_STATE_CHECK_TIMEOUT in us
+ * Check the Mac layer state every MAC_STATE_CHECK_TIMEOUT in ms
  */
-#define MAC_STATE_CHECK_TIMEOUT                     1000000
+#define MAC_STATE_CHECK_TIMEOUT                     1000
 
 /*!
  * Maximum number of times the MAC layer tries to get an acknowledge.
@@ -480,6 +480,9 @@ typedef union uLoRaMacFrameCtrl
      * Byte-access to the bits
      */
     uint8_t Value;
+    /*!
+     * Structure containing single access to bits
+     */
     struct sCtrlBits
     {
         /*!
@@ -541,6 +544,10 @@ typedef enum eLoRaMacEventInfoStatus
      */
     LORAMAC_EVENT_INFO_STATUS_DOWNLINK_REPEATED,
     /*!
+     * The node has lost MAX_FCNT_GAP or more frames.
+     */
+    LORAMAC_EVENT_INFO_STATUS_DOWNLINK_TOO_MANY_FRAMES_LOSS,
+    /*!
      * An address error occured
      */
     LORAMAC_EVENT_INFO_STATUS_ADDRESS_FAIL,
@@ -559,6 +566,9 @@ typedef union eLoRaMacFlags_t
      * Byte-access to the bits
      */
     uint8_t Value;
+    /*!
+     * Structure containing single access to bits
+     */
     struct sMacFlagBits
     {
         /*!
@@ -910,7 +920,7 @@ typedef struct sMlmeReqJoin
 }MlmeReqJoin_t;
 
 /*!
- *
+ * LoRaMAC MLME-Request structure
  */
 typedef struct sMlmeReq
 {
@@ -985,9 +995,10 @@ typedef struct sMlmeConfirm
  * \ref MIB_JOIN_ACCEPT_DELAY_1      | YES | YES
  * \ref MIB_JOIN_ACCEPT_DELAY_2      | YES | YES
  * \ref MIB_CHANNELS_DATARATE        | YES | YES
+ * \ref MIB_CHANNELS_DEFAULT_DATARATE| YES | YES
  * \ref MIB_CHANNELS_TX_POWER        | YES | YES
- * \ref MIB_UPLINK_COUNTER           | YES | NO
- * \ref MIB_DOWNLINK_COUNTER         | YES | NO
+ * \ref MIB_UPLINK_COUNTER           | YES | YES
+ * \ref MIB_DOWNLINK_COUNTER         | YES | YES
  * \ref MIB_MULTICAST_CHANNEL        | YES | NO
  *
  * The following table provides links to the function implementations of the
@@ -1087,35 +1098,45 @@ typedef enum eMib
      */
     MIB_CHANNELS_NB_REP,
     /*!
-     * Maximum receive window duration in [us]
+     * Maximum receive window duration in [ms]
      *
      * LoRaWAN Specification V1.0, chapter 3.3.3
      */
     MIB_MAX_RX_WINDOW_DURATION,
     /*!
-     * Receive delay 1 in [us]
+     * Receive delay 1 in [ms]
      *
      * LoRaWAN Specification V1.0, chapter 6
      */
     MIB_RECEIVE_DELAY_1,
     /*!
-     * Receive delay 2 in [us]
+     * Receive delay 2 in [ms]
      *
      * LoRaWAN Specification V1.0, chapter 6
      */
     MIB_RECEIVE_DELAY_2,
     /*!
-     * Join accept delay 1 in [us]
+     * Join accept delay 1 in [ms]
      *
      * LoRaWAN Specification V1.0, chapter 6
      */
     MIB_JOIN_ACCEPT_DELAY_1,
     /*!
-     * Join accept delay 2 in [us]
+     * Join accept delay 2 in [ms]
      *
      * LoRaWAN Specification V1.0, chapter 6
      */
     MIB_JOIN_ACCEPT_DELAY_2,
+    /*!
+     * Default Data rate of a channel
+     *
+     * LoRaWAN Specification V1.0, chapter 7
+     *
+     * EU868 - [DR_0, DR_1, DR_2, DR_3, DR_4, DR_5, DR_6, DR_7]
+     *
+     * US915 - [DR_0, DR_1, DR_2, DR_3, DR_4, DR_8, DR_9, DR_10, DR_11, DR_12, DR_13]
+     */
+    MIB_CHANNELS_DEFAULT_DATARATE,
     /*!
      * Data rate of a channel
      *
@@ -1273,6 +1294,12 @@ typedef union uMibParam
      * Related MIB type: \ref MIB_JOIN_ACCEPT_DELAY_2
      */
     uint32_t JoinAcceptDelay2;
+    /*!
+     * Channels data rate
+     *
+     * Related MIB type: \ref MIB_CHANNELS_DEFAULT_DATARATE
+     */
+    int8_t ChannelsDefaultDatarate;
     /*!
      * Channels data rate
      *

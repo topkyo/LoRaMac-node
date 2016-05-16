@@ -19,8 +19,30 @@ Maintainer: Miguel Luis and Gregory Cristian
  * \brief Timer time variable definition
  */
 #ifndef TimerTime_t
-typedef uint64_t TimerTime_t;
+typedef uint32_t TimerTime_t;
 #endif
+
+/*!
+ * \brief Structure holding the context date (saved before lunching a timeout)
+ */
+typedef struct
+{
+    uint8_t Date;
+    uint8_t Month;
+    uint8_t Year;
+}DateContext_t;
+
+/*!
+ * \brief Structure holding the context Time (saved before lunching a timeout)
+ */
+typedef struct
+{
+    uint8_t Hours;
+    uint8_t Minutes;
+    uint8_t Seconds;
+    uint16_t Miliseconds;
+}TimeContext_t;
+
 
 /*!
  * \brief Initializes the RTC timer
@@ -28,18 +50,6 @@ typedef uint64_t TimerTime_t;
  * \remark The timer is based on the RTC
  */
 void RtcInit( void );
-
-/*!
- * \brief Stop the RTC Timer
- */
-void RtcStopTimer( void );
-
-/*!
- * \brief Return the minimum timeout the RTC is able to handle
- *
- * \retval minimum value for a timeout
- */
-uint32_t RtcGetMinimumTimeout( void );
 
 /*!
  * \brief Start the RTC timer
@@ -62,7 +72,23 @@ TimerTime_t RtcGetTimerValue( void );
  *
  * \retval RTC Elapsed time since the last alarm
  */
-uint32_t RtcGetTimerElapsedTime( void );
+uint32_t RtcGetElapsedAlarmTime( void );
+
+/*!
+ * \brief Compute the timeout time of a future event in time
+ *
+ * \param[IN] futureEventInTime       value in time
+ * \retval    time between now and the futureEventInTime
+ */
+TimerTime_t RtcComputeFutureEventTime( TimerTime_t futureEventInTime );
+
+/*!
+ * \brief Compute the elapsed time since a fix event in time
+ *
+ * \param[IN] eventInTime       value in time
+ * \retval    elasped time since the eventInTime
+ */
+TimerTime_t RtcComputeElapsedTime( TimerTime_t eventInTime );
 
 /*!
  * \brief This function block the MCU from going into Low Power mode
@@ -80,12 +106,5 @@ void RtcEnterLowPowerStopMode( void );
  * \brief Restore the MCU to its normal operation mode
  */
 void RtcRecoverMcuStatus( void );
-
-/*!
- * \brief Perfoms a standard blocking delay in the code execution
- *
- * \param [IN] delay Delay value in ms
- */
-void RtcDelayMs ( uint32_t delay );
 
 #endif // __RTC_BOARD_H__

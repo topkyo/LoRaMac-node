@@ -12,7 +12,6 @@ License: Revised BSD License, see LICENSE.TXT file include in the project
 
 Maintainer: Andreas Pella (IMST GmbH), Miguel Luis and Gregory Cristian
 */
-
 #include <string.h>
 #include <math.h>
 #include "board.h"
@@ -23,18 +22,23 @@ Maintainer: Andreas Pella (IMST GmbH), Miguel Luis and Gregory Cristian
 /*!
  * Join requests trials duty cycle.
  */
-#define OVER_THE_AIR_ACTIVATION_DUTYCYCLE           10000000  // 10 [s] value in us
+#define OVER_THE_AIR_ACTIVATION_DUTYCYCLE           10000 // 10 [s] value in ms
 
 /*!
- * Defines the application data transmission duty cycle. 5s, value in [us].
+ * Defines the application data transmission duty cycle. 5s, value in [ms].
  */
-#define APP_TX_DUTYCYCLE                            5000000
+#define APP_TX_DUTYCYCLE                            5000
 
 /*!
  * Defines a random delay for application data transmission duty cycle. 1s,
- * value in [us].
+ * value in [ms].
  */
-#define APP_TX_DUTYCYCLE_RND                        1000000
+#define APP_TX_DUTYCYCLE_RND                        1000
+
+/*!
+ * Default datarate
+ */
+#define LORAWAN_DEFAULT_DATARATE                    DR_0
 
 /*!
  * LoRaWAN confirmed messages
@@ -69,6 +73,7 @@ Maintainer: Andreas Pella (IMST GmbH), Miguel Luis and Gregory Cristian
 #define LC7                { 867700000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
 #define LC8                { 867900000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
 #define LC9                { 868800000, { ( ( DR_7 << 4 ) | DR_7 ) }, 2 }
+#define LC10               { 868300000, { ( ( DR_6 << 4 ) | DR_6 ) }, 1 }
 
 #endif
 
@@ -98,7 +103,7 @@ static uint8_t AppSKey[] = LORAWAN_APPSKEY;
 /*!
  * Device address
  */
-static uint32_t DevAddr;
+static uint32_t DevAddr = LORAWAN_DEVICE_ADDRESS;
 
 #endif
 
@@ -256,7 +261,7 @@ static bool SendFrame( void )
         mcpsReq.Type = MCPS_UNCONFIRMED;
         mcpsReq.Req.Unconfirmed.fBuffer = NULL;
         mcpsReq.Req.Unconfirmed.fBufferSize = 0;
-        mcpsReq.Req.Unconfirmed.Datarate = DR_0;
+        mcpsReq.Req.Unconfirmed.Datarate = LORAWAN_DEFAULT_DATARATE;
     }
     else
     {
@@ -266,7 +271,7 @@ static bool SendFrame( void )
             mcpsReq.Req.Unconfirmed.fPort = AppPort;
             mcpsReq.Req.Unconfirmed.fBuffer = AppData;
             mcpsReq.Req.Unconfirmed.fBufferSize = AppDataSize;
-            mcpsReq.Req.Unconfirmed.Datarate = DR_0;
+            mcpsReq.Req.Unconfirmed.Datarate = LORAWAN_DEFAULT_DATARATE;
         }
         else
         {
@@ -275,7 +280,7 @@ static bool SendFrame( void )
             mcpsReq.Req.Confirmed.fBuffer = AppData;
             mcpsReq.Req.Confirmed.fBufferSize = AppDataSize;
             mcpsReq.Req.Confirmed.NbTrials = 8;
-            mcpsReq.Req.Confirmed.Datarate = DR_0;
+            mcpsReq.Req.Confirmed.Datarate = LORAWAN_DEFAULT_DATARATE;
         }
     }
 
@@ -336,14 +341,14 @@ static void OnLed2TimerEvent( void )
 /*!
  * \brief   MCPS-Confirm event function
  *
- * \param   [IN] McpsConfirm - Pointer to the confirm structure,
+ * \param   [IN] mcpsConfirm - Pointer to the confirm structure,
  *               containing confirm attributes.
  */
-static void McpsConfirm( McpsConfirm_t *McpsConfirm )
+static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
 {
-    if( McpsConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK )
+    if( mcpsConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK )
     {
-        switch( McpsConfirm->McpsRequest )
+        switch( mcpsConfirm->McpsRequest )
         {
             case MCPS_UNCONFIRMED:
             {
@@ -377,17 +382,17 @@ static void McpsConfirm( McpsConfirm_t *McpsConfirm )
 /*!
  * \brief   MCPS-Indication event function
  *
- * \param   [IN] McpsIndication - Pointer to the indication structure,
+ * \param   [IN] mcpsIndication - Pointer to the indication structure,
  *               containing indication attributes.
  */
-static void McpsIndication( McpsIndication_t *McpsIndication )
+static void McpsIndication( McpsIndication_t *mcpsIndication )
 {
-    if( McpsIndication->Status != LORAMAC_EVENT_INFO_STATUS_OK )
+    if( mcpsIndication->Status != LORAMAC_EVENT_INFO_STATUS_OK )
     {
         return;
     }
 
-    switch( McpsIndication->McpsIndication )
+    switch( mcpsIndication->McpsIndication )
     {
         case MCPS_UNCONFIRMED:
         {
@@ -424,15 +429,15 @@ static void McpsIndication( McpsIndication_t *McpsIndication )
         ComplianceTest.DownLinkCounter++;
     }
 
-    if( McpsIndication->RxData == true )
+    if( mcpsIndication->RxData == true )
     {
-        switch( McpsIndication->Port )
+        switch( mcpsIndication->Port )
         {
         case 1: // The application LED can be controlled on port 1 or 2
         case 2:
-            if( McpsIndication->BufferSize == 1 )
+            if( mcpsIndication->BufferSize == 1 )
             {
-                AppLedStateOn = McpsIndication->Buffer[0] & 0x01;
+                AppLedStateOn = mcpsIndication->Buffer[0] & 0x01;
                 GpioWrite( &Led3, ( ( AppLedStateOn & 0x01 ) != 0 ) ? 1 : 0 );
             }
             break;
@@ -440,11 +445,11 @@ static void McpsIndication( McpsIndication_t *McpsIndication )
             if( ComplianceTest.Running == false )
             {
                 // Check compliance test enable command (i)
-                if( ( McpsIndication->BufferSize == 4 ) && 
-                    ( McpsIndication->Buffer[0] == 0x01 ) &&
-                    ( McpsIndication->Buffer[1] == 0x01 ) &&
-                    ( McpsIndication->Buffer[2] == 0x01 ) &&
-                    ( McpsIndication->Buffer[3] == 0x01 ) )
+                if( ( mcpsIndication->BufferSize == 4 ) &&
+                    ( mcpsIndication->Buffer[0] == 0x01 ) &&
+                    ( mcpsIndication->Buffer[1] == 0x01 ) &&
+                    ( mcpsIndication->Buffer[2] == 0x01 ) &&
+                    ( mcpsIndication->Buffer[3] == 0x01 ) )
                 {
                     IsTxConfirmed = false;
                     AppPort = 224;
@@ -468,7 +473,7 @@ static void McpsIndication( McpsIndication_t *McpsIndication )
             }
             else
             {
-                ComplianceTest.State = McpsIndication->Buffer[0];
+                ComplianceTest.State = mcpsIndication->Buffer[0];
                 switch( ComplianceTest.State )
                 {
                 case 0: // Check compliance test disable command (ii)
@@ -498,12 +503,12 @@ static void McpsIndication( McpsIndication_t *McpsIndication )
                     ComplianceTest.State = 1;
                     break;
                 case 4: // (vii)
-                    AppDataSize = McpsIndication->BufferSize;
+                    AppDataSize = mcpsIndication->BufferSize;
 
                     AppData[0] = 4;
                     for( uint8_t i = 1; i < AppDataSize; i++ )
                     {
-                        AppData[i] = McpsIndication->Buffer[i] + 1;
+                        AppData[i] = mcpsIndication->Buffer[i] + 1;
                     }
                     break;
                 case 5: // (viii)
@@ -531,14 +536,14 @@ static void McpsIndication( McpsIndication_t *McpsIndication )
 /*!
  * \brief   MLME-Confirm event function
  *
- * \param   [IN] MlmeConfirm - Pointer to the confirm structure,
+ * \param   [IN] mlmeConfirm - Pointer to the confirm structure,
  *               containing confirm attributes.
  */
-static void MlmeConfirm( MlmeConfirm_t *MlmeConfirm )
+static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
 {
-    if( MlmeConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK )
+    if( mlmeConfirm->Status == LORAMAC_EVENT_INFO_STATUS_OK )
     {
-        switch( MlmeConfirm->MlmeRequest )
+        switch( mlmeConfirm->MlmeRequest )
         {
             case MLME_JOIN:
             {
@@ -552,8 +557,8 @@ static void MlmeConfirm( MlmeConfirm_t *MlmeConfirm )
                 if( ComplianceTest.Running == true )
                 {
                     ComplianceTest.LinkCheck = true;
-                    ComplianceTest.DemodMargin = MlmeConfirm->DemodMargin;
-                    ComplianceTest.NbGateways = MlmeConfirm->NbGateways;
+                    ComplianceTest.DemodMargin = mlmeConfirm->DemodMargin;
+                    ComplianceTest.NbGateways = mlmeConfirm->NbGateways;
                 }
                 break;
             }
@@ -593,10 +598,10 @@ int main( void )
                 TimerInit( &TxNextPacketTimer, OnTxNextPacketTimerEvent );
 
                 TimerInit( &Led4Timer, OnLed4TimerEvent );
-                TimerSetValue( &Led4Timer, 25000 );
+                TimerSetValue( &Led4Timer, 25 );
 
                 TimerInit( &Led2Timer, OnLed2TimerEvent );
-                TimerSetValue( &Led2Timer, 25000 );
+                TimerSetValue( &Led2Timer, 25 );
 
                 mibReq.Type = MIB_ADR;
                 mibReq.Param.AdrEnable = LORAWAN_ADR_ON;
@@ -616,6 +621,7 @@ int main( void )
                 LoRaMacChannelAdd( 6, ( ChannelParams_t )LC7 );
                 LoRaMacChannelAdd( 7, ( ChannelParams_t )LC8 );
                 LoRaMacChannelAdd( 8, ( ChannelParams_t )LC9 );
+                LoRaMacChannelAdd( 9, ( ChannelParams_t )LC10 );
 #endif
 
 #endif
@@ -650,11 +656,15 @@ int main( void )
                 DeviceState = DEVICE_STATE_CYCLE;
 
 #else
-                // Random seed initialization
-                srand1( BoardGetRandomSeed( ) );
+                // Choose a random device address if not already defined in Comissioning.h
+                if( DevAddr == 0 )
+                {
+                    // Random seed initialization
+                    srand1( BoardGetRandomSeed( ) );
 
-                // Choose a random device address
-                DevAddr = randr( 0, 0x01FFFFFF );
+                    // Choose a random device address
+                    DevAddr = randr( 0, 0x01FFFFFF );
+                }
 
                 mibReq.Type = MIB_NET_ID;
                 mibReq.Param.NetID = LORAWAN_NETWORK_ID;
@@ -690,8 +700,8 @@ int main( void )
                 }
                 if( ComplianceTest.Running == true )
                 {
-                    // Schedule next packet transmission as soon as possible
-                    TxDutyCycleTime = 300000; // 300 ms
+                    // Schedule next packet transmission
+                    TxDutyCycleTime = 5000; // 5000 ms
                 }
                 else
                 {

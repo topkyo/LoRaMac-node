@@ -33,12 +33,22 @@ Maintainer: Miguel Luis and Gregory Cristian
 /*!
  * Minimal datarate that can be used by the node
  */
-#define LORAMAC_MIN_DATARATE                        DR_0
+#define LORAMAC_TX_MIN_DATARATE                     DR_0
 
 /*!
  * Minimal datarate that can be used by the node
  */
-#define LORAMAC_MAX_DATARATE                        DR_7
+#define LORAMAC_TX_MAX_DATARATE                     DR_7
+
+/*!
+ * Minimal datarate that can be used by the node
+ */
+#define LORAMAC_RX_MIN_DATARATE                     DR_0
+
+/*!
+ * Minimal datarate that can be used by the node
+ */
+#define LORAMAC_RX_MAX_DATARATE                     DR_7
 
 /*!
  * Default datarate used by the node
@@ -127,8 +137,18 @@ typedef enum
  */
 // Channel = { Frequency [Hz], { ( ( DrMax << 4 ) | DrMin ) }, Band }
 #define LC1                { 868100000, { ( ( DR_5 << 4 ) | DR_0 ) }, 1 }
-#define LC2                { 868300000, { ( ( DR_6 << 4 ) | DR_0 ) }, 1 }
+#define LC2                { 868300000, { ( ( DR_5 << 4 ) | DR_0 ) }, 1 }
 #define LC3                { 868500000, { ( ( DR_5 << 4 ) | DR_0 ) }, 1 }
+
+/*!
+ * LoRaMac duty cycle for the join procedure
+ */
+#define JOIN_DC            1000
+
+/*!
+ * LoRaMac channels which are allowed for the join procedure
+ */
+#define JOIN_CHANNELS      ( uint16_t )( LC( 1 ) | LC( 2 ) | LC( 3 ) )
 
 #elif defined( USE_BAND_915 ) || defined( USE_BAND_915_HYBRID )
 
@@ -140,12 +160,22 @@ typedef enum
 /*!
  * Minimal datarate that can be used by the node
  */
-#define LORAMAC_MIN_DATARATE                        DR_0
+#define LORAMAC_TX_MIN_DATARATE                     DR_0
 
 /*!
  * Minimal datarate that can be used by the node
  */
-#define LORAMAC_MAX_DATARATE                        DR_4
+#define LORAMAC_TX_MAX_DATARATE                     DR_4
+
+/*!
+ * Minimal datarate that can be used by the node
+ */
+#define LORAMAC_RX_MIN_DATARATE                     DR_8
+
+/*!
+ * Minimal datarate that can be used by the node
+ */
+#define LORAMAC_RX_MAX_DATARATE                     DR_13
 
 /*!
  * Default datarate used by the node

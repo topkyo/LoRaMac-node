@@ -33,9 +33,10 @@ uint8_t NmeaString[128];
  */
 uint8_t NmeaStringSize = 0;
 
+Gpio_t GpsPowerEn;
+Gpio_t GpsPps;
 
-PpsTigger_t PpsTigger;
-
+PpsTrigger_t PpsTrigger;
 
 void GpsMcuOnPpsSignal( void )
 {
@@ -52,35 +53,47 @@ void GpsMcuOnPpsSignal( void )
 
 void GpsMcuInvertPpsTrigger( void )
 {
-    if( PpsTigger == PpsTiggerIsRising )
+    if( PpsTrigger == PpsTriggerIsRising )
     {
-        PpsTigger = PpsTiggerIsFalling;
+        PpsTrigger = PpsTriggerIsFalling;
         GpioSetInterrupt( &GpsPps, IRQ_FALLING_EDGE, IRQ_VERY_LOW_PRIORITY, &GpsMcuOnPpsSignal );
     }
     else
     {
-        PpsTigger = PpsTiggerIsRising;
+        PpsTrigger = PpsTriggerIsRising;
         GpioSetInterrupt( &GpsPps, IRQ_RISING_EDGE, IRQ_VERY_LOW_PRIORITY, &GpsMcuOnPpsSignal );
     }
-}
-
-uint8_t GpsMcuGetPpsTrigger( void )
-{
-    return( PpsTigger );
 }
 
 void GpsMcuInit( void )
 {
     NmeaStringSize = 0;
-    PpsTigger = PpsTiggerIsFalling;
+    PpsTrigger = PpsTriggerIsFalling;
+
+    GpioInit( &GpsPowerEn, GPS_POWER_ON, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 1 );
+
+    GpioInit( &GpsPps, GPS_PPS, PIN_INPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
+    GpioSetInterrupt( &GpsPps, IRQ_FALLING_EDGE, IRQ_VERY_LOW_PRIORITY, &GpsMcuOnPpsSignal );
 
     FifoInit( &Uart1.FifoRx, RxBuffer, FIFO_RX_SIZE );
     Uart1.IrqNotify = GpsMcuIrqNotify;
 
-    //GpioWrite( &GpsPowerEn, 1 );  // power down the GPS
+    GpsMcuStart( );
+}
+
+void GpsMcuStart( void )
+{
     GpioWrite( &GpsPowerEn, 0 );    // power up the GPS
-    GpioInit( &GpsPps, GPS_PPS, PIN_INPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
-    GpioSetInterrupt( &GpsPps, IRQ_FALLING_EDGE, IRQ_VERY_LOW_PRIORITY, &GpsMcuOnPpsSignal );
+}
+
+void GpsMcuStop( void )
+{
+    GpioWrite( &GpsPowerEn, 1 );    // power down the GPS
+}
+
+void GpsMcuProcess( void )
+{
+
 }
 
 void GpsMcuIrqNotify( UartNotifyId_t id )
@@ -90,7 +103,7 @@ void GpsMcuIrqNotify( UartNotifyId_t id )
     {
         if( UartGetChar( &Uart1, &data ) == 0 )
         {
-            if( ( data == '$' ) || ( NmeaStringSize >= 128 ) )
+            if( ( data == '$' ) || ( NmeaStringSize >= 127 ) )
             {
                 NmeaStringSize = 0;
             }
@@ -99,7 +112,7 @@ void GpsMcuIrqNotify( UartNotifyId_t id )
 
             if( data == '\n' )
             {
-                NmeaString[NmeaStringSize] = '\0';
+                NmeaString[NmeaStringSize++] = '\0';
                 GpsParseGpsData( ( int8_t* )NmeaString, NmeaStringSize );
                 UartDeInit( &Uart1 );
                 BlockLowPowerDuringTask ( false );

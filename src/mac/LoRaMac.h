@@ -47,7 +47,7 @@
 #define __LORAMAC_H__
 
 // Includes board dependent definitions such as channels frequencies
-#include "LoRaMac-board.h"
+#include "LoRaMac-definitions.h"
 
 /*!
  * Beacon interval in ms
@@ -140,21 +140,6 @@
 #define LORAMAC_MFR_LEN                             4
 
 /*!
- * Syncword for Private LoRa networks
- */
-#define LORA_MAC_PRIVATE_SYNCWORD                   0x12
-
-/*!
- * Syncword for Public LoRa networks
- */
-#define LORA_MAC_PUBLIC_SYNCWORD                    0x34
-
- /*!
- * LoRaMac internal state
- */
-//uint32_t LoRaMacState;
-
-/*!
  * LoRaWAN devices classes definition
  */
 typedef enum eDeviceClass
@@ -162,19 +147,19 @@ typedef enum eDeviceClass
     /*!
      * LoRaWAN device class A
      *
-     * LoRaWAN Specification V1.0, chapter 3ff
+     * LoRaWAN Specification V1.0.1, chapter 3ff
      */
     CLASS_A,
     /*!
      * LoRaWAN device class B
      *
-     * LoRaWAN Specification V1.0, chapter 8ff
+     * LoRaWAN Specification V1.0.1, chapter 8ff
      */
     CLASS_B,
     /*!
      * LoRaWAN device class C
      *
-     * LoRaWAN Specification V1.0, chapter 17ff
+     * LoRaWAN Specification V1.0.1, chapter 17ff
      */
     CLASS_C,
 }DeviceClass_t;
@@ -274,6 +259,68 @@ typedef struct sRx2ChannelParams
 }Rx2ChannelParams_t;
 
 /*!
+ * Global MAC layer parameters
+ */
+typedef struct sLoRaMacParams
+{
+    /*!
+     * Channels TX power
+     */
+    int8_t ChannelsTxPower;
+    /*!
+     * Channels data rate
+     */
+    int8_t ChannelsDatarate;
+    /*!
+     * System overall timing error in milliseconds. 
+     * [-SystemMaxRxError : +SystemMaxRxError]
+     * Default: +/-10 ms
+     */
+    uint32_t SystemMaxRxError;
+    /*!
+     * Minimum required number of symbols to detect an Rx frame
+     * Default: 6 symbols
+     */
+    uint8_t MinRxSymbols;
+    /*!
+     * LoRaMac maximum time a reception window stays open
+     */
+    uint32_t MaxRxWindow;
+    /*!
+     * Receive delay 1
+     */
+    uint32_t ReceiveDelay1;
+    /*!
+     * Receive delay 2
+     */
+    uint32_t ReceiveDelay2;
+    /*!
+     * Join accept delay 1
+     */
+    uint32_t JoinAcceptDelay1;
+    /*!
+     * Join accept delay 1
+     */
+    uint32_t JoinAcceptDelay2;
+    /*!
+     * Number of uplink messages repetitions [1:15] (unconfirmed messages only)
+     */
+    uint8_t ChannelsNbRep;
+    /*!
+     * Datarate offset between uplink and downlink on first window
+     */
+    uint8_t Rx1DrOffset;
+    /*!
+     * LoRaMAC 2nd reception window settings
+     */
+    Rx2ChannelParams_t Rx2Channel;
+    /*!
+     * Mask indicating which channels are enabled
+     */
+    uint16_t ChannelsMask[6];
+}LoRaMacParams_t;
+
+/*!
  * LoRaMAC multicast channel parameter
  */
 typedef struct sMulticastParams
@@ -303,7 +350,7 @@ typedef struct sMulticastParams
 /*!
  * LoRaMAC frame types
  *
- * LoRaWAN Specification V1.0, chapter 4.2.1, table 1
+ * LoRaWAN Specification V1.0.1, chapter 4.2.1, table 1
  */
 typedef enum eLoRaMacFrameType
 {
@@ -344,7 +391,7 @@ typedef enum eLoRaMacFrameType
 /*!
  * LoRaMAC mote MAC commands
  *
- * LoRaWAN Specification V1.0, chapter 5, table 4
+ * LoRaWAN Specification V1.0.1, chapter 5, table 4
  */
 typedef enum eLoRaMacMoteCmd
 {
@@ -381,7 +428,7 @@ typedef enum eLoRaMacMoteCmd
 /*!
  * LoRaMAC server MAC commands
  *
- * LoRaWAN Specification V1.0, chapter 5, table 4
+ * LoRaWAN Specification V1.0.1 chapter 5, table 4
  */
 typedef enum eLoRaMacSrvCmd
 {
@@ -441,7 +488,7 @@ typedef enum eLoRaMacBatteryLevel
 /*!
  * LoRaMAC header field definition (MHDR field)
  *
- * LoRaWAN Specification V1.0, chapter 4.2
+ * LoRaWAN Specification V1.0.1, chapter 4.2
  */
 typedef union uLoRaMacHeader
 {
@@ -472,7 +519,7 @@ typedef union uLoRaMacHeader
 /*!
  * LoRaMAC frame control field definition (FCtrl)
  *
- * LoRaWAN Specification V1.0, chapter 4.3.1
+ * LoRaWAN Specification V1.0.1, chapter 4.3.1
  */
 typedef union uLoRaMacFrameCtrl
 {
@@ -518,23 +565,27 @@ typedef enum eLoRaMacEventInfoStatus
      */
     LORAMAC_EVENT_INFO_STATUS_OK = 0,
     /*!
-     * An error occured during the execution of the service
+     * An error occurred during the execution of the service
      */
     LORAMAC_EVENT_INFO_STATUS_ERROR,
     /*!
-     * A Tx timeouit occured
+     * A Tx timeout occurred
      */
     LORAMAC_EVENT_INFO_STATUS_TX_TIMEOUT,
     /*!
-     * An Rx timeout occured on receive window 2
+     * An Rx timeout occurred on receive window 2
      */
     LORAMAC_EVENT_INFO_STATUS_RX2_TIMEOUT,
     /*!
-     * An Rx error occured on receive window 2
+     * An Rx error occurred on receive window 1
+     */
+    LORAMAC_EVENT_INFO_STATUS_RX1_ERROR,
+    /*!
+     * An Rx error occurred on receive window 2
      */
     LORAMAC_EVENT_INFO_STATUS_RX2_ERROR,
     /*!
-     * An error occured in the join procedure
+     * An error occurred in the join procedure
      */
     LORAMAC_EVENT_INFO_STATUS_JOIN_FAIL,
     /*!
@@ -544,11 +595,16 @@ typedef enum eLoRaMacEventInfoStatus
      */
     LORAMAC_EVENT_INFO_STATUS_DOWNLINK_REPEATED,
     /*!
+     * The MAC could not retransmit a frame since the MAC decreased the datarate. The
+     * payload size is not applicable for the datarate.
+     */
+    LORAMAC_EVENT_INFO_STATUS_TX_DR_PAYLOAD_SIZE_ERROR,
+    /*!
      * The node has lost MAX_FCNT_GAP or more frames.
      */
     LORAMAC_EVENT_INFO_STATUS_DOWNLINK_TOO_MANY_FRAMES_LOSS,
     /*!
-     * An address error occured
+     * An address error occurred
      */
     LORAMAC_EVENT_INFO_STATUS_ADDRESS_FAIL,
     /*!
@@ -579,6 +635,10 @@ typedef union eLoRaMacFlags_t
          * MCPS-Ind pending
          */
         uint8_t McpsInd         : 1;
+        /*!
+         * MCPS-Ind pending. Skip indication to the application layer
+         */
+        uint8_t McpsIndSkip     : 1;
         /*!
          * MLME-Req pending
          */
@@ -642,7 +702,7 @@ typedef struct sMcpsReqUnconfirmed
      * Frame port field. Must be set if the payload is not empty. Use the
      * application specific frame port values: [1...223]
      *
-     * LoRaWAN Specification V1.0, chapter 4.3.2
+     * LoRaWAN Specification V1.0.1, chapter 4.3.2
      */
     uint8_t fPort;
     /*!
@@ -668,7 +728,7 @@ typedef struct sMcpsReqConfirmed
      * Frame port field. Must be set if the payload is not empty. Use the
      * application specific frame port values: [1...223]
      *
-     * LoRaWAN Specification V1.0, chapter 4.3.2
+     * LoRaWAN Specification V1.0.1, chapter 4.3.2
      */
     uint8_t fPort;
     /*!
@@ -686,7 +746,7 @@ typedef struct sMcpsReqConfirmed
     /*!
      * Number of trials to transmit the frame, if the LoRaMAC layer did not
      * receive an acknowledgment. The MAC performs a datarate adaptation,
-     * according to the LoRaWAN Specification V1.0, chapter 18.4, according
+     * according to the LoRaWAN Specification V1.0.1, chapter 19.4, according
      * to the following table:
      *
      * Transmission nb | Data Rate
@@ -792,6 +852,10 @@ typedef struct sMcpsConfirm
      * The uplink counter value related to the frame
      */
     uint32_t UpLinkCounter;
+    /*!
+     * The uplink frequency related to the frame
+     */
+    uint32_t UpLinkFrequency;
 }McpsConfirm_t;
 
 /*!
@@ -869,6 +933,7 @@ typedef struct sMcpsIndication
  * --------------------- | :-----: | :--------: | :------: | :-----:
  * \ref MLME_JOIN        | YES     | NO         | NO       | YES
  * \ref MLME_LINK_CHECK  | YES     | NO         | NO       | YES
+ * \ref MLME_TXCW        | YES     | NO         | NO       | YES
  *
  * The following table provides links to the function implementations of the
  * related MLME primitives.
@@ -883,15 +948,27 @@ typedef enum eMlme
     /*!
      * Initiates the Over-the-Air activation
      *
-     * LoRaWAN Specification V1.0, chapter 6.2
+     * LoRaWAN Specification V1.0.1, chapter 6.2
      */
     MLME_JOIN,
     /*!
      * LinkCheckReq - Connectivity validation
      *
-     * LoRaWAN Specification V1.0, chapter 5, table 4
+     * LoRaWAN Specification V1.0.1, chapter 5, table 4
      */
     MLME_LINK_CHECK,
+    /*!
+     * Sets Tx continuous wave mode
+     *
+     * LoRaWAN end-device certification
+     */
+    MLME_TXCW,
+    /*!
+     * Sets Tx continuous wave mode (new LoRa-Alliance CC definition)
+     *
+     * LoRaWAN end-device certification
+     */
+    MLME_TXCW_1,
 }Mlme_t;
 
 /*!
@@ -902,22 +979,45 @@ typedef struct sMlmeReqJoin
     /*!
      * Globally unique end-device identifier
      *
-     * LoRaWAN Specification V1.0, chapter 6.2.1
+     * LoRaWAN Specification V1.0.1, chapter 6.2.1
      */
     uint8_t *DevEui;
     /*!
      * Application identifier
      *
-     * LoRaWAN Specification V1.0, chapter 6.1.2
+     * LoRaWAN Specification V1.0.1, chapter 6.1.2
      */
     uint8_t *AppEui;
     /*!
      * AES-128 application key
      *
-     * LoRaWAN Specification V1.0, chapter 6.2.2
+     * LoRaWAN Specification V1.0.1, chapter 6.2.2
      */
     uint8_t *AppKey;
+    /*!
+     * Number of trials for the join request.
+     */
+    uint8_t NbTrials;
 }MlmeReqJoin_t;
+
+/*!
+ * LoRaMAC MLME-Request for Tx continuous wave mode
+ */
+typedef struct sMlmeReqTxCw
+{
+    /*!
+     * Time in seconds while the radio is kept in continuous wave mode
+     */
+    uint16_t Timeout;
+    /*!
+     * RF frequency to set (Only used with new way)
+     */
+    uint32_t Frequency;
+    /*!
+     * RF output power to set (Only used with new way)
+     */
+    uint8_t Power;
+}MlmeReqTxCw_t;
 
 /*!
  * LoRaMAC MLME-Request structure
@@ -938,6 +1038,10 @@ typedef struct sMlmeReq
          * MLME-Request parameters for a join request
          */
         MlmeReqJoin_t Join;
+        /*!
+         * MLME-Request parameters for Tx continuous mode request
+         */
+        MlmeReqTxCw_t TxCw;
     }Req;
 }MlmeReq_t;
 
@@ -967,6 +1071,10 @@ typedef struct sMlmeConfirm
      * Number of gateways which received the last LinkCheckReq
      */
     uint8_t NbGateways;
+    /*!
+     * Provides the number of retransmissions
+     */
+    uint8_t NbRetries;
 }MlmeConfirm_t;
 
 /*!
@@ -988,6 +1096,7 @@ typedef struct sMlmeConfirm
  * \ref MIB_CHANNELS                 | YES | NO
  * \ref MIB_RX2_CHANNEL              | YES | YES
  * \ref MIB_CHANNELS_MASK            | YES | YES
+ * \ref MIB_CHANNELS_DEFAULT_MASK    | YES | YES
  * \ref MIB_CHANNELS_NB_REP          | YES | YES
  * \ref MIB_MAX_RX_WINDOW_DURATION   | YES | YES
  * \ref MIB_RECEIVE_DELAY_1          | YES | YES
@@ -997,9 +1106,12 @@ typedef struct sMlmeConfirm
  * \ref MIB_CHANNELS_DATARATE        | YES | YES
  * \ref MIB_CHANNELS_DEFAULT_DATARATE| YES | YES
  * \ref MIB_CHANNELS_TX_POWER        | YES | YES
+ * \ref MIB_CHANNELS_DEFAULT_TX_POWER| YES | YES
  * \ref MIB_UPLINK_COUNTER           | YES | YES
  * \ref MIB_DOWNLINK_COUNTER         | YES | YES
  * \ref MIB_MULTICAST_CHANNEL        | YES | NO
+ * \ref MIB_SYSTEM_MAX_RX_ERROR      | YES | YES
+ * \ref MIB_MIN_RX_SYMBOLS           | YES | YES
  *
  * The following table provides links to the function implementations of the
  * related MIB primitives:
@@ -1014,19 +1126,19 @@ typedef enum eMib
     /*!
      * LoRaWAN device class
      *
-     * LoRaWAN Specification V1.0
+     * LoRaWAN Specification V1.0.1
      */
     MIB_DEVICE_CLASS,
     /*!
      * LoRaWAN Network joined attribute
      *
-     * LoRaWAN Specification V1.0
+     * LoRaWAN Specification V1.0.1
      */
     MIB_NETWORK_JOINED,
     /*!
      * Adaptive data rate
      *
-     * LoRaWAN Specification V1.0, chapter 4.3.1.1
+     * LoRaWAN Specification V1.0.1, chapter 4.3.1.1
      *
      * [true: ADR enabled, false: ADR disabled]
      */
@@ -1034,31 +1146,31 @@ typedef enum eMib
     /*!
      * Network identifier
      *
-     * LoRaWAN Specification V1.0, chapter 6.2.5
+     * LoRaWAN Specification V1.0.1, chapter 6.1.1
      */
     MIB_NET_ID,
     /*!
      * End-device address
      *
-     * LoRaWAN Specification V1.0, chapter 6.1.2
+     * LoRaWAN Specification V1.0.1, chapter 6.1.1
      */
     MIB_DEV_ADDR,
     /*!
      * Network session key
      *
-     * LoRaWAN Specification V1.0, chapter 6.1.3
+     * LoRaWAN Specification V1.0.1, chapter 6.1.3
      */
     MIB_NWK_SKEY,
     /*!
      * Application session key
      *
-     * LoRaWAN Specification V1.0, chapter 6.1.4
+     * LoRaWAN Specification V1.0.1, chapter 6.1.4
      */
     MIB_APP_SKEY,
     /*!
      * Set the network type to public or private
      *
-     * LoRaWAN Specification V1.0, chapter 7
+     * LoRaWAN Specification V1.0.1, chapter 7
      *
      * [true: public network, false: private network]
      */
@@ -1066,7 +1178,7 @@ typedef enum eMib
     /*!
      * Support the operation with repeaters
      *
-     * LoRaWAN Specification V1.0, chapter 7
+     * LoRaWAN Specification V1.0.1, chapter 7
      *
      * [true: repeater support enabled, false: repeater support disabled]
      */
@@ -1076,61 +1188,73 @@ typedef enum eMib
      * pointer which references the first entry of the channel list. The
      * list is of size LORA_MAX_NB_CHANNELS
      *
-     * LoRaWAN Specification V1.0, chapter 7
+     * LoRaWAN Specification V1.0.1, chapter 7
      */
     MIB_CHANNELS,
     /*!
      * Set receive window 2 channel
      *
-     * LoRaWAN Specification V1.0, chapter 3.3.2
+     * LoRaWAN Specification V1.0.1, chapter 3.3.2
      */
     MIB_RX2_CHANNEL,
     /*!
+     * Set receive window 2 channel
+     *
+     * LoRaWAN Specification V1.0.1, chapter 3.3.2
+     */
+    MIB_RX2_DEFAULT_CHANNEL,
+    /*!
      * LoRaWAN channels mask
      *
-     * LoRaWAN Specification V1.0, chapter 5.2
+     * LoRaWAN Specification V1.0.1, chapter 7
      */
     MIB_CHANNELS_MASK,
     /*!
+     * LoRaWAN default channels mask
+     *
+     * LoRaWAN Specification V1.0.1, chapter 7
+     */
+    MIB_CHANNELS_DEFAULT_MASK,
+    /*!
      * Set the number of repetitions on a channel
      *
-     * LoRaWAN Specification V1.0, chapter 5.2
+     * LoRaWAN Specification V1.0.1, chapter 5.2
      */
     MIB_CHANNELS_NB_REP,
     /*!
      * Maximum receive window duration in [ms]
      *
-     * LoRaWAN Specification V1.0, chapter 3.3.3
+     * LoRaWAN Specification V1.0.1, chapter 3.3.3
      */
     MIB_MAX_RX_WINDOW_DURATION,
     /*!
      * Receive delay 1 in [ms]
      *
-     * LoRaWAN Specification V1.0, chapter 6
+     * LoRaWAN Specification V1.0.1, chapter 7
      */
     MIB_RECEIVE_DELAY_1,
     /*!
      * Receive delay 2 in [ms]
      *
-     * LoRaWAN Specification V1.0, chapter 6
+     * LoRaWAN Specification V1.0.1, chapter 7
      */
     MIB_RECEIVE_DELAY_2,
     /*!
      * Join accept delay 1 in [ms]
      *
-     * LoRaWAN Specification V1.0, chapter 6
+     * LoRaWAN Specification V1.0.1, chapter 7
      */
     MIB_JOIN_ACCEPT_DELAY_1,
     /*!
      * Join accept delay 2 in [ms]
      *
-     * LoRaWAN Specification V1.0, chapter 6
+     * LoRaWAN Specification V1.0.1, chapter 7
      */
     MIB_JOIN_ACCEPT_DELAY_2,
     /*!
      * Default Data rate of a channel
      *
-     * LoRaWAN Specification V1.0, chapter 7
+     * LoRaWAN Specification V1.0.1, chapter 7
      *
      * EU868 - [DR_0, DR_1, DR_2, DR_3, DR_4, DR_5, DR_6, DR_7]
      *
@@ -1140,7 +1264,7 @@ typedef enum eMib
     /*!
      * Data rate of a channel
      *
-     * LoRaWAN Specification V1.0, chapter 7
+     * LoRaWAN Specification V1.0.1, chapter 7
      *
      * EU868 - [DR_0, DR_1, DR_2, DR_3, DR_4, DR_5, DR_6, DR_7]
      *
@@ -1150,7 +1274,7 @@ typedef enum eMib
     /*!
      * Transmission power of a channel
      *
-     * LoRaWAN Specification V1.0, chapter 7
+     * LoRaWAN Specification V1.0.1, chapter 7
      *
      * EU868 - [TX_POWER_20_DBM, TX_POWER_14_DBM, TX_POWER_11_DBM,
      *          TX_POWER_08_DBM, TX_POWER_05_DBM, TX_POWER_02_DBM]
@@ -1162,15 +1286,29 @@ typedef enum eMib
      */
     MIB_CHANNELS_TX_POWER,
     /*!
+     * Transmission power of a channel
+     *
+     * LoRaWAN Specification V1.0.1, chapter 7
+     *
+     * EU868 - [TX_POWER_20_DBM, TX_POWER_14_DBM, TX_POWER_11_DBM,
+     *          TX_POWER_08_DBM, TX_POWER_05_DBM, TX_POWER_02_DBM]
+     *
+     * US915 - [TX_POWER_30_DBM, TX_POWER_28_DBM, TX_POWER_26_DBM,
+     *          TX_POWER_24_DBM, TX_POWER_22_DBM, TX_POWER_20_DBM,
+     *          TX_POWER_18_DBM, TX_POWER_14_DBM, TX_POWER_12_DBM,
+     *          TX_POWER_10_DBM]
+     */
+    MIB_CHANNELS_DEFAULT_TX_POWER,
+    /*!
      * LoRaWAN Up-link counter
      *
-     * LoRaWAN Specification V1.0, chapter 4.3.1.5
+     * LoRaWAN Specification V1.0.1, chapter 4.3.1.5
      */
     MIB_UPLINK_COUNTER,
     /*!
      * LoRaWAN Down-link counter
      *
-     * LoRaWAN Specification V1.0, chapter 4.3.1.5
+     * LoRaWAN Specification V1.0.1, chapter 4.3.1.5
      */
     MIB_DOWNLINK_COUNTER,
     /*!
@@ -1179,6 +1317,17 @@ typedef enum eMib
      * NULL, the list is empty.
      */
     MIB_MULTICAST_CHANNEL,
+    /*!
+     * System overall timing error in milliseconds. 
+     * [-SystemMaxRxError : +SystemMaxRxError]
+     * Default: +/-10 ms
+     */
+    MIB_SYSTEM_MAX_RX_ERROR,
+    /*!
+     * Minimum required number of symbols to detect an Rx frame
+     * Default: 6 symbols
+     */
+    MIB_MIN_RX_SYMBOLS,
 }Mib_t;
 
 /*!
@@ -1252,12 +1401,24 @@ typedef union uMibParam
      * Related MIB type: \ref MIB_RX2_CHANNEL
      */
     Rx2ChannelParams_t Rx2Channel;
+     /*!
+     * Channel for the receive window 2
+     *
+     * Related MIB type: \ref MIB_RX2_DEFAULT_CHANNEL
+     */
+    Rx2ChannelParams_t Rx2DefaultChannel;
     /*!
      * Channel mask
      *
      * Related MIB type: \ref MIB_CHANNELS_MASK
      */
     uint16_t* ChannelsMask;
+    /*!
+     * Default channel mask
+     *
+     * Related MIB type: \ref MIB_CHANNELS_DEFAULT_MASK
+     */
+    uint16_t* ChannelsDefaultMask;
     /*!
      * Number of frame repetitions
      *
@@ -1309,6 +1470,12 @@ typedef union uMibParam
     /*!
      * Channels TX power
      *
+     * Related MIB type: \ref MIB_CHANNELS_DEFAULT_TX_POWER
+     */
+    int8_t ChannelsDefaultTxPower;
+    /*!
+     * Channels TX power
+     *
      * Related MIB type: \ref MIB_CHANNELS_TX_POWER
      */
     int8_t ChannelsTxPower;
@@ -1330,6 +1497,18 @@ typedef union uMibParam
      * Related MIB type: \ref MIB_MULTICAST_CHANNEL
      */
     MulticastParams_t* MulticastList;
+    /*!
+     * System overall timing error in milliseconds. 
+     *
+     * Related MIB type: \ref MIB_SYSTEM_MAX_RX_ERROR
+     */
+    uint32_t SystemMaxRxError;
+    /*!
+     * Minimum required number of symbols to detect an Rx frame
+     *
+     * Related MIB type: \ref MIB_MIN_RX_SYMBOLS
+     */
+    uint8_t MinRxSymbols;
 }MibParam_t;
 
 /*!
@@ -1401,11 +1580,11 @@ typedef enum eLoRaMacStatus
      */
     LORAMAC_STATUS_NO_NETWORK_JOINED,
     /*!
-     * Service not started - playload lenght error
+     * Service not started - payload lenght error
      */
     LORAMAC_STATUS_LENGTH_ERROR,
     /*!
-     * Service not started - playload lenght error
+     * Service not started - payload lenght error
      */
     LORAMAC_STATUS_MAC_CMD_LENGTH_ERROR,
     /*!

@@ -45,6 +45,21 @@ extern tNmeaGpsData NmeaGpsData;
 void GpsInit( void );
 
 /*!
+ * \brief Switch ON the GPS
+ */
+void GpsStart( void );
+
+/*!
+ * \brief Switch OFF the GPS
+ */
+void GpsStop( void );
+
+/*!
+ * Updates the GPS status
+ */
+void GpsProcess( void );
+
+/*!
  * \brief PPS signal handling function
  */
 void GpsPpsHandler( bool *parseData );

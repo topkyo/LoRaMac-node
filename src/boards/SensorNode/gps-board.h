@@ -20,11 +20,11 @@ Maintainer: Miguel Luis and Gregory Cristian
  * reception of data on the UART. Depending of the GPS, the PPS
  * signal may go low or high to indicate the presence of data
  */
-typedef enum PpsTigger_s
+typedef enum PpsTrigger_s
 {
-    PpsTiggerIsRising = 0,
-    PpsTiggerIsFalling,
-}PpsTigger_t;
+    PpsTriggerIsRising = 0,
+    PpsTriggerIsFalling,
+}PpsTrigger_t;
 
 /*!
  * \brief Low level handling of the PPS signal from the GPS receiver
@@ -37,14 +37,24 @@ void GpsMcuOnPpsSignal( void );
 void GpsMcuInvertPpsTrigger( void );
 
 /*!
- * \brief Return the Edge which give correct GPS data
- */
-uint8_t GpsMcuGetPpsTrigger( void );
-
-/*!
- * \brief Low level Initialisation of the UART and IRQ for the GPS
+ * \brief Low level Initialization of the UART and IRQ for the GPS
  */
 void GpsMcuInit( void );
+
+/*!
+ * \brief Switch ON the GPS
+ */
+void GpsMcuStart( void );
+
+/*!
+ * \brief Switch OFF the GPS
+ */
+void GpsMcuStop( void );
+
+/*!
+ * Updates the GPS status
+ */
+void GpsMcuProcess( void );
 
 /*!
  * \brief IRQ handler for the UART receiver

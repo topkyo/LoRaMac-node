@@ -13,7 +13,7 @@ LoRaWAN endpoint stack implementation and example projects.
 The aim of this project is to show an example of the endpoint LoRaWAN stack implementation.
 
 This LoRaWAN stack is an EU868 and US915 bands Class A and Class C endpoint implementation
-fully compatible with LoRaWAN 1.0 specification.
+fully compatible with LoRaWAN 1.0.1 specification.
 Each LoRaWAN application example includes the LoRaWAN certification protocol implementation.
 
 SX1272/76 radio drivers are also provided.
@@ -22,14 +22,6 @@ In case only point to point links are required a Ping-Pong application is provid
 *The LoRaWAN stack API documentation can be found at: http://stackforce.github.io/LoRaMac-doc/*
 
 **Note 1:**
-
-*A version 3.x API to version 4.x API wrapper is available.
-Applications built using version 3.x API should work without modifications except that
-one must include LoRaMac-api-v3.h instead of LoRaMac.h file*
-
-**_The 3.x API wrapper will be deprecated starting at version 5.0.0_**
-
-**Note 2:**
 
 *A port of this project can be found on [MBED Semtech Team page](http://developer.mbed.org/teams/Semtech/)*
 
@@ -72,12 +64,45 @@ platforms are:
         SENSORS : Proximity, Magnetic, 3 axis Accelerometer, Pressure,
                   Temperature
         GPS     : Yes, UP501 module
-        SDCARD  : No
         EXTENSION HEADER : Yes, 20 pins
         REMARK  : The MCU and Radio are on an IMST iM880A module
 
+    - MoteII
+        MCU     : STM32L051C8 - 64K FLASH, 8K RAM, Timers, SPI, I2C,
+                                USART,
+                                USB 2.0 full-speed device/host/OTG controller (Not used),
+                                DAC, ADC, DMA
+        RADIO   : SX1272
+        ANTENNA : Printed circuit antenna
+        BUTTONS : 3
+        LEDS    : 3
+        SENSORS : Magnetic, 3 axis Accelerometer, Pressure,
+                  Temperature
+        GPS     : Yes, PAM7Q module
+        Display : OLED
+        ST-Link : Yes, MBED like
+        EXTENSION HEADER : Yes, 20 pins
+        REMARK  : The MCU and Radio are on an IMST iM881A module
+
+    - NAMote72
+        MCU     : STM32L152RC - 256K FLASH, 32K RAM, Timers, SPI, I2C,
+                                USART,
+                                USB 2.0 full-speed device/host/OTG controller (Not used),
+                                DAC, ADC, DMA
+        RADIO   : SX1272
+        ANTENNA : Printed circuit antenna
+        BUTTONS : No
+        LEDS    : 4
+        SENSORS : Magnetic, 3 axis Accelerometer, Pressure,
+                  Temperature
+        GPS     : Yes, SIM39EA module
+        Display : OLED
+        ST-Link : Yes, MBED like
+        EXTENSION HEADER : Yes, Arduino connectors
+        REMARK  : None
+
     - SensorNode
-        MCU     : STM32L151C8 - 64K FLASH, 10K RAM, Timers, SPI, I2C,
+        MCU     : STM32L151CBU6 - 128K FLASH, 16K RAM, Timers, SPI, I2C,
                                 USART,
                                 USB 2.0 full-speed device/host/OTG controller,
                                 DAC, ADC, DMA
@@ -88,7 +113,6 @@ platforms are:
         SENSORS : Proximity, Magnetic, 3 axis Accelerometer, Pressure,
                   Temperature
         GPS     : Yes, SIM39EA module
-        SDCARD  : No
         EXTENSION No
         REMARK  : The MCU and Radio are on an NYMTEK Cherry-LCC module
 
@@ -118,7 +142,79 @@ not of a bootloader and the radio frequency band to be used.
 
 6. Changelog
 -------------
-2015-05-13, V4.2.0
+2017-04-19, V4.3.2
+* General (Last release based on LoRaWAN specification 1.0.1)
+    1. This version has passed EU868 and US915 LoRa-Alliance compliance tests.
+    2. GitHub reported issues corrections.
+    3. Added an algorithm to automatically compute the Rx windows parameters. (Window symbolTimeout and Offset from downlink expected time)
+    4. Added a workaround to reset the radio in case a TxTimeout occurs.
+    5. Modified FSK modem handling to use the provided symbolTimeout (1 symbol equals 1 byte) when in RxSingle mode.
+    6. Added newly defined TxCw(Tx Continuous Wave) certification protocol command.
+    7. Added a fix for an overflow issue that could happen with NmeaStringSize variable.
+    8. Improved GpioMcuInit function to first configure the output pin state before activating the pin.
+
+* LoRaWAN
+    1. GitHub reported issues corrections.
+    2. Changed the AdrAckCounter handling as expected by the test houses.
+    3. Fix an issue where the node stopped transmitting.
+    4. Removed useless LoRaMacPayload buffer.
+    5. MAC layer indications handling simplification.
+    6. Relocate parameter settings from ResetMacParameters to the initialization.
+
+2017-02-27, V4.3.1
+* General
+    1. This version has passed EU868 and US915 LoRa-Alliance compliance tests.
+    2. Update the MAC layer in order to be LoRaWAN version 1.0.1 compliant (Mainly US915 bug fixes)
+    3. Removed api-v3 support from the project.
+    4. GitHub reported issues corrections.
+    5. Updated SensorNode projects according to the new MCU reference STM32L151CBU6. Bigger memories.
+    6. Addition of MoteII platform based on the IMST module iM881A (STM32L051C8)
+    7. Addition of NAMote72 platform
+    8. Correct compliance test protocol command 0x06 behaviour
+    9. Added TxCw (Tx continuous wave) LoRaWAN compliance protocol command.
+    10. Added TxContinuousWave support to the radio drivers.
+    11. Updated ST HAL drivers.
+        - STM32L1xx_HAL-Driver : V1.2.0
+        - STM32L0xx_HAL_Driver : V1.7.0
+
+* LoRaWAN
+    1. US band corrections in order to pass the LoRaWAN certification.
+    2. GitHub reported issues corrections.
+    3. Add region CN470 support.
+
+2016-06-22, V4.3.0
+* General
+    1. This version has passed all LoRa-Alliance compliance tests.
+    2. Update the MAC layer in order to be LoRaWAN version 1.0.1 compliant
+    3. Applied to all application files the certification protocol change for LoRaWAN 1.0.1 compliance tests.
+
+       **REMARK**: api-v3 application files aren't updated.
+
+    4. Add radio RX_TIMEOUT irq clear into the irq handler.
+    5. Removed the end less loop from HAL_UART_ErrorCallback.
+    6. Update of the STM32L0 HAL to version 1.6.0
+    7. Consolidated the line endings across all project files.
+       Windows line endings has been choose for almost every file.
+
+* LoRaWAN
+    1. Updated maximum payload size for US band.
+    2. Update datarate offset table for US band.
+    3. Make MAC commands sticky
+    4. Add retransmission back-off
+    5. Remove the TxPower limitation for US band on LoRaMacMibSetRequestConfirm function. The power will be limited anyway when the SendFrameOnChannel functions is called.
+    6. Issue(#81): Bug fix in function LoRaMacMlmeRequest case MLME_JOIN. Function will return LORAMAC_STATUS_BUSY in case the MAC is in status MAC_TX_DELAYED.
+    7. Add debug pin support to LoRaMote platform.
+    8. Updated and improved MPL3115 device driver.
+    9. Issue(#83): Bug fix in parameter validation
+    10. Issue(#84): Fix issue of CalibrateTimer function.
+    11. RTC driver major update
+    12. Applied pull request #87.
+    13. Add a function to verify the RX frequency of window 2 for US band.
+    14. Issue(#88): Bug fix in function PrepareFrame where repeated MAC commands were not handled correctly.
+    15. Bug fix in OnRadioRxDone. Node now drops frames on port 0 with fOpts > 0.
+    16. Bug fix in OnRadioRxDone. Node now receives frames with fOpts > 0 when no payload is present.
+
+2016-05-13, V4.2.0
 * General
     1. This version has passed all LoRa-Alliance compliance tests.
     2. Update STM32L1xx_HAL_Driver version to 1.5. Update related drivers and implementations accordingly.
@@ -150,7 +246,7 @@ not of a bootloader and the radio frequency band to be used.
     12. Accept MAC information of duplicated, confirmed downlinks.
     13. Issue(#74): Drop frames with a downlink counter difference greater or equal to MAX_FCNT_GAP.
 
-2015-03-10, V4.1.0
+2016-03-10, V4.1.0
 * General
     1. This version has passed all mandatory LoRa-Alliance compliance tests.
 

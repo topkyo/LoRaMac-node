@@ -1,27 +1,46 @@
-/*
- / _____)             _              | |
-( (____  _____ ____ _| |_ _____  ____| |__
- \____ \| ___ |    (_   _) ___ |/ ___)  _ \
- _____) ) ____| | | || |_| ____( (___| | | |
-(______/|_____)_|_|_| \__)_____)\____)_| |_|
-    (C)2016 Semtech
+/*!
+ * \file      main.c
+ *
+ * \brief     LoRaMac classC device implementation
+ *
+ * \copyright Revised BSD License, see section \ref LICENSE.
+ *
+ * \code
+ *                ______                              _
+ *               / _____)             _              | |
+ *              ( (____  _____ ____ _| |_ _____  ____| |__
+ *               \____ \| ___ |    (_   _) ___ |/ ___)  _ \
+ *               _____) ) ____| | | || |_| ____( (___| | | |
+ *              (______/|_____)_|_|_| \__)_____)\____)_| |_|
+ *              (C)2013-2017 Semtech
+ *
+ * \endcode
+ *
+ * \author    Miguel Luis ( Semtech )
+ *
+ * \author    Gregory Cristian ( Semtech )
+ */
 
-Description: LoRaMac classC device implementation
+/*! \file classC/MoteII/main.c */
 
-License: Revised BSD License, see LICENSE.TXT file include in the project
-
-Maintainer: Miguel Luis and Gregory Cristian
-*/
-
-#include <string.h>
-#include <math.h>
+#include "utilities.h"
 #include "board.h"
-
+#include "gpio.h"
+#include "gps.h"
+#include "mpl3115.h"
 #include "LoRaMac.h"
 #include "Commissioning.h"
 
 #include "buttons.h"
 #include "screen.h"
+
+#ifndef ACTIVE_REGION
+
+#warning "No active region defined, LORAMAC_REGION_EU868 will be used as default."
+
+#define ACTIVE_REGION LORAMAC_REGION_EU868
+
+#endif
 
 /*!
  * Defines the application data transmission duty cycle. 5s, value in [ms].
@@ -51,7 +70,7 @@ Maintainer: Miguel Luis and Gregory Cristian
  */
 #define LORAWAN_ADR_ON                              1
 
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
 
 #include "LoRaMacTest.h"
 
@@ -62,39 +81,12 @@ Maintainer: Miguel Luis and Gregory Cristian
  */
 #define LORAWAN_DUTYCYCLE_ON                        true
 
-#define USE_SEMTECH_DEFAULT_CHANNEL_LINEUP          1
-
-#if( USE_SEMTECH_DEFAULT_CHANNEL_LINEUP == 1 )
-
-#define LC4                { 867100000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC5                { 867300000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC6                { 867500000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC7                { 867700000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC8                { 867900000, { ( ( DR_5 << 4 ) | DR_0 ) }, 0 }
-#define LC9                { 868800000, { ( ( DR_7 << 4 ) | DR_7 ) }, 2 }
-#define LC10               { 868300000, { ( ( DR_6 << 4 ) | DR_6 ) }, 1 }
-
-#endif
-
 #endif
 
 /*!
  * LoRaWAN application port
  */
 #define LORAWAN_APP_PORT                            2
-
-/*!
- * User application data buffer size
- */
-#if defined( USE_BAND_868 )
-
-#define LORAWAN_APP_DATA_SIZE                       16
-
-#elif defined( USE_BAND_915 ) || defined( USE_BAND_915_HYBRID )
-
-#define LORAWAN_APP_DATA_SIZE                       11
-
-#endif
 
 static uint8_t DevEui[] = LORAWAN_DEVICE_EUI;
 static uint8_t AppEui[] = LORAWAN_APPLICATION_EUI;
@@ -115,12 +107,12 @@ static uint8_t AppPort = LORAWAN_APP_PORT;
 /*!
  * User application data size
  */
-static uint8_t AppDataSize = LORAWAN_APP_DATA_SIZE;
-
+static uint8_t AppDataSize = 16;
+static uint8_t AppDataSizeBackup = 16;
 /*!
  * User application data buffer size
  */
-#define LORAWAN_APP_DATA_MAX_SIZE                           64
+#define LORAWAN_APP_DATA_MAX_SIZE                           242
 
 /*!
  * User application data
@@ -130,7 +122,7 @@ static uint8_t AppData[LORAWAN_APP_DATA_MAX_SIZE];
 /*!
  * Indicates if the node is sending confirmed or unconfirmed messages
  */
-static uint8_t IsTxConfirmed = false;
+static uint8_t IsTxConfirmed = LORAWAN_CONFIRMED_MSG_ON;
 
 /*!
  * Defines the application data transmission duty cycle
@@ -207,59 +199,84 @@ struct ComplianceTest_s
 }ComplianceTest;
 
 /*!
+ * LED GPIO pins objects
+ */
+extern Gpio_t Led1;
+extern Gpio_t Led2;
+extern Gpio_t Led3;
+
+/*!
  * \brief   Prepares the payload of the frame
  */
 static void PrepareTxFrame( uint8_t port )
 {
+    const LoRaMacRegion_t region = ACTIVE_REGION;
+
     switch( port )
     {
     case 2:
+        switch( region )
         {
-#if defined( USE_BAND_868 )
-            LoRaMacUplinkStatus.Pressure = ( uint16_t )( MPL3115ReadPressure( ) / 10 );             // in hPa / 10
-            LoRaMacUplinkStatus.Temperature = ( int16_t )( MPL3115ReadTemperature( ) * 100 );       // in °C * 100
-            LoRaMacUplinkStatus.AltitudeBar = ( int16_t )( MPL3115ReadAltitude( ) * 10 );           // in m * 10
-            LoRaMacUplinkStatus.BatteryLevel = BoardGetBatteryLevel( );                             // 1 (very low) to 254 (fully charged)
-            GpsGetLatestGpsPositionBinary( &LoRaMacUplinkStatus.Latitude, &LoRaMacUplinkStatus.Longitude );
-            LoRaMacUplinkStatus.AltitudeGps = GpsGetLatestGpsAltitude( );                           // in m
-            LoRaMacUplinkStatus.GpsHaxFix = GpsHasFix( );
+            case LORAMAC_REGION_CN779:
+            case LORAMAC_REGION_EU868:
+            case LORAMAC_REGION_IN865:
+            case LORAMAC_REGION_KR920:
+            {
+                LoRaMacUplinkStatus.Pressure = ( uint16_t )( MPL3115ReadPressure( ) / 10 );             // in hPa / 10
+                LoRaMacUplinkStatus.Temperature = ( int16_t )( MPL3115ReadTemperature( ) * 100 );       // in Â°C * 100
+                LoRaMacUplinkStatus.AltitudeBar = ( int16_t )( MPL3115ReadAltitude( ) * 10 );           // in m * 10
+                LoRaMacUplinkStatus.BatteryLevel = BoardGetBatteryLevel( );                             // 1 (very low) to 254 (fully charged)
+                GpsGetLatestGpsPositionBinary( &LoRaMacUplinkStatus.Latitude, &LoRaMacUplinkStatus.Longitude );
+                LoRaMacUplinkStatus.AltitudeGps = GpsGetLatestGpsAltitude( );                           // in m
+                LoRaMacUplinkStatus.GpsHaxFix = GpsHasFix( );
 
-            AppData[0] = AppLedStateOn;
-            AppData[1] = ( LoRaMacUplinkStatus.Pressure >> 8 ) & 0xFF;
-            AppData[2] = LoRaMacUplinkStatus.Pressure & 0xFF;
-            AppData[3] = ( LoRaMacUplinkStatus.Temperature >> 8 ) & 0xFF;
-            AppData[4] = LoRaMacUplinkStatus.Temperature & 0xFF;
-            AppData[5] = ( LoRaMacUplinkStatus.AltitudeBar >> 8 ) & 0xFF;
-            AppData[6] = LoRaMacUplinkStatus.AltitudeBar & 0xFF;
-            AppData[7] = LoRaMacUplinkStatus.BatteryLevel;
-            AppData[8] = ( LoRaMacUplinkStatus.Latitude >> 16 ) & 0xFF;
-            AppData[9] = ( LoRaMacUplinkStatus.Latitude >> 8 ) & 0xFF;
-            AppData[10] = LoRaMacUplinkStatus.Latitude & 0xFF;
-            AppData[11] = ( LoRaMacUplinkStatus.Longitude >> 16 ) & 0xFF;
-            AppData[12] = ( LoRaMacUplinkStatus.Longitude >> 8 ) & 0xFF;
-            AppData[13] = LoRaMacUplinkStatus.Longitude & 0xFF;
-            AppData[14] = ( LoRaMacUplinkStatus.AltitudeGps >> 8 ) & 0xFF;
-            AppData[15] = LoRaMacUplinkStatus.AltitudeGps & 0xFF;
-#elif defined( USE_BAND_915 ) || defined( USE_BAND_915_HYBRID )
-            LoRaMacUplinkStatus.Temperature = ( int16_t )( MPL3115ReadTemperature( ) * 100 );       // in °C * 100
+                AppDataSizeBackup = AppDataSize = 16;
+                AppData[0] = AppLedStateOn;
+                AppData[1] = ( LoRaMacUplinkStatus.Pressure >> 8 ) & 0xFF;
+                AppData[2] = LoRaMacUplinkStatus.Pressure & 0xFF;
+                AppData[3] = ( LoRaMacUplinkStatus.Temperature >> 8 ) & 0xFF;
+                AppData[4] = LoRaMacUplinkStatus.Temperature & 0xFF;
+                AppData[5] = ( LoRaMacUplinkStatus.AltitudeBar >> 8 ) & 0xFF;
+                AppData[6] = LoRaMacUplinkStatus.AltitudeBar & 0xFF;
+                AppData[7] = LoRaMacUplinkStatus.BatteryLevel;
+                AppData[8] = ( LoRaMacUplinkStatus.Latitude >> 16 ) & 0xFF;
+                AppData[9] = ( LoRaMacUplinkStatus.Latitude >> 8 ) & 0xFF;
+                AppData[10] = LoRaMacUplinkStatus.Latitude & 0xFF;
+                AppData[11] = ( LoRaMacUplinkStatus.Longitude >> 16 ) & 0xFF;
+                AppData[12] = ( LoRaMacUplinkStatus.Longitude >> 8 ) & 0xFF;
+                AppData[13] = LoRaMacUplinkStatus.Longitude & 0xFF;
+                AppData[14] = ( LoRaMacUplinkStatus.AltitudeGps >> 8 ) & 0xFF;
+                AppData[15] = LoRaMacUplinkStatus.AltitudeGps & 0xFF;
+                break;
+            }
+            case LORAMAC_REGION_AS923:
+            case LORAMAC_REGION_AU915:
+            case LORAMAC_REGION_US915:
+            case LORAMAC_REGION_US915_HYBRID:
+            {
+                LoRaMacUplinkStatus.Temperature = ( int16_t )( MPL3115ReadTemperature( ) * 100 );       // in Â°C * 100
+                LoRaMacUplinkStatus.BatteryLevel = BoardGetBatteryLevel( );                             // 1 (very low) to 254 (fully charged)
+                GpsGetLatestGpsPositionBinary( &LoRaMacUplinkStatus.Latitude, &LoRaMacUplinkStatus.Longitude );
+                LoRaMacUplinkStatus.AltitudeGps = GpsGetLatestGpsAltitude( );                           // in m
+                LoRaMacUplinkStatus.GpsHaxFix = GpsHasFix( );
 
-            LoRaMacUplinkStatus.BatteryLevel = BoardGetBatteryLevel( );                             // 1 (very low) to 254 (fully charged)
-            GpsGetLatestGpsPositionBinary( &LoRaMacUplinkStatus.Latitude, &LoRaMacUplinkStatus.Longitude );
-            LoRaMacUplinkStatus.AltitudeGps = GpsGetLatestGpsAltitude( );                           // in m
-            LoRaMacUplinkStatus.GpsHaxFix = GpsHasFix( );
-
-            AppData[0] = AppLedStateOn;
-            AppData[1] = LoRaMacUplinkStatus.Temperature;                                           // Signed degrees celsius in half degree units. So,  +/-63 C
-            AppData[2] = LoRaMacUplinkStatus.BatteryLevel;                                          // Per LoRaWAN spec; 0=Charging; 1...254 = level, 255 = N/A
-            AppData[3] = ( LoRaMacUplinkStatus.Latitude >> 16 ) & 0xFF;
-            AppData[4] = ( LoRaMacUplinkStatus.Latitude >> 8 ) & 0xFF;
-            AppData[5] = LoRaMacUplinkStatus.Latitude & 0xFF;
-            AppData[6] = ( LoRaMacUplinkStatus.Longitude >> 16 ) & 0xFF;
-            AppData[7] = ( LoRaMacUplinkStatus.Longitude >> 8 ) & 0xFF;
-            AppData[8] = LoRaMacUplinkStatus.Longitude & 0xFF;
-            AppData[9] = ( LoRaMacUplinkStatus.AltitudeGps >> 8 ) & 0xFF;
-            AppData[10] = LoRaMacUplinkStatus.AltitudeGps & 0xFF;
-#endif
+                AppDataSizeBackup = AppDataSize = 11;
+                AppData[0] = AppLedStateOn;
+                AppData[1] = LoRaMacUplinkStatus.Temperature;                                           // Signed degrees celsius in half degree units. So,  +/-63 C
+                AppData[2] = LoRaMacUplinkStatus.BatteryLevel;                                          // Per LoRaWAN spec; 0=Charging; 1...254 = level, 255 = N/A
+                AppData[3] = ( LoRaMacUplinkStatus.Latitude >> 16 ) & 0xFF;
+                AppData[4] = ( LoRaMacUplinkStatus.Latitude >> 8 ) & 0xFF;
+                AppData[5] = LoRaMacUplinkStatus.Latitude & 0xFF;
+                AppData[6] = ( LoRaMacUplinkStatus.Longitude >> 16 ) & 0xFF;
+                AppData[7] = ( LoRaMacUplinkStatus.Longitude >> 8 ) & 0xFF;
+                AppData[8] = LoRaMacUplinkStatus.Longitude & 0xFF;
+                AppData[9] = ( LoRaMacUplinkStatus.AltitudeGps >> 8 ) & 0xFF;
+                AppData[10] = LoRaMacUplinkStatus.AltitudeGps & 0xFF;
+                break;
+            }
+            default:
+                // Unsupported region.
+                break;
         }
         break;
     case 224:
@@ -376,7 +393,22 @@ static void OnTxNextPacketTimerEvent( void )
         }
         else
         {
-            DeviceState = DEVICE_STATE_JOIN;
+            // Network not joined yet. Try to join again
+            MlmeReq_t mlmeReq;
+            mlmeReq.Type = MLME_JOIN;
+            mlmeReq.Req.Join.DevEui = AppSettings.DevEui;
+            mlmeReq.Req.Join.AppEui = AppSettings.AppEui;
+            mlmeReq.Req.Join.AppKey = AppSettings.AppKey;
+            mlmeReq.Req.Join.Datarate = LORAWAN_DEFAULT_DATARATE;
+
+            if( LoRaMacMlmeRequest( &mlmeReq ) == LORAMAC_STATUS_OK )
+            {
+                DeviceState = DEVICE_STATE_SLEEP;
+            }
+            else
+            {
+                DeviceState = DEVICE_STATE_CYCLE;
+            }
         }
     }
 }
@@ -491,6 +523,12 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
     // Check Port
     // Check Datarate
     // Check FramePending
+    if( mcpsIndication->FramePending == true )
+    {
+        // The server signals that it has pending data to be sent.
+        // We schedule an uplink as soon as possible to flush the server.
+        OnTxNextPacketTimerEvent( );
+    }
     // Check Buffer
     // Check BufferSize
     // Check Rssi
@@ -548,6 +586,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                 {
                     IsTxConfirmed = false;
                     AppPort = 224;
+                    AppDataSizeBackup = AppDataSize;
                     AppDataSize = 2;
                     ComplianceTest.DownLinkCounter = 0;
                     ComplianceTest.LinkCheck = false;
@@ -561,7 +600,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                     mibReq.Param.AdrEnable = true;
                     LoRaMacMibSetRequestConfirm( &mibReq );
 
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
                     LoRaMacTestSetDutyCycleOn( false );
 #endif
                     GpsStop( );
@@ -575,7 +614,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                 case 0: // Check compliance test disable command (ii)
                     IsTxConfirmed = LORAWAN_CONFIRMED_MSG_ON;
                     AppPort = LORAWAN_APP_PORT;
-                    AppDataSize = LORAWAN_APP_DATA_SIZE;
+                    AppDataSize = AppDataSizeBackup;
                     ComplianceTest.DownLinkCounter = 0;
                     ComplianceTest.Running = false;
 
@@ -583,7 +622,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                     mibReq.Type = MIB_ADR;
                     mibReq.Param.AdrEnable = AppSettings.AdrOn;
                     LoRaMacMibSetRequestConfirm( &mibReq );
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
                     LoRaMacTestSetDutyCycleOn( AppSettings.DutyCycleOn );
 #endif
                     GpsStart( );
@@ -603,7 +642,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                     AppDataSize = mcpsIndication->BufferSize;
 
                     AppData[0] = 4;
-                    for( uint8_t i = 1; i < AppDataSize; i++ )
+                    for( uint8_t i = 1; i < MIN( AppDataSize, LORAWAN_APP_DATA_MAX_SIZE ); i++ )
                     {
                         AppData[i] = mcpsIndication->Buffer[i] + 1;
                     }
@@ -622,7 +661,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                         // Disable TestMode and revert back to normal operation
                         IsTxConfirmed = LORAWAN_CONFIRMED_MSG_ON;
                         AppPort = LORAWAN_APP_PORT;
-                        AppDataSize = LORAWAN_APP_DATA_SIZE;
+                        AppDataSize = AppDataSizeBackup;
                         ComplianceTest.DownLinkCounter = 0;
                         ComplianceTest.Running = false;
 
@@ -630,7 +669,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                         mibReq.Type = MIB_ADR;
                         mibReq.Param.AdrEnable = AppSettings.AdrOn;
                         LoRaMacMibSetRequestConfirm( &mibReq );
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
                         LoRaMacTestSetDutyCycleOn( AppSettings.DutyCycleOn );
 #endif
                         GpsStart( );
@@ -640,10 +679,16 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
                         mlmeReq.Req.Join.DevEui = AppSettings.DevEui;
                         mlmeReq.Req.Join.AppEui = AppSettings.AppEui;
                         mlmeReq.Req.Join.AppKey = AppSettings.AppKey;
-                        mlmeReq.Req.Join.NbTrials = 3;
+                        mlmeReq.Req.Join.Datarate = LORAWAN_DEFAULT_DATARATE;
 
-                        LoRaMacMlmeRequest( &mlmeReq );
-                        DeviceState = DEVICE_STATE_SLEEP;
+                        if( LoRaMacMlmeRequest( &mlmeReq ) == LORAMAC_STATUS_OK )
+                        {
+                            DeviceState = DEVICE_STATE_SLEEP;
+                        }
+                        else
+                        {
+                            DeviceState = DEVICE_STATE_CYCLE;
+                        }
                     }
                     break;
                 case 7: // (x)
@@ -704,7 +749,21 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
             else
             {
                 // Join was not successful. Try to join again
-                DeviceState = DEVICE_STATE_JOIN;
+                MlmeReq_t mlmeReq;
+                mlmeReq.Type = MLME_JOIN;
+                mlmeReq.Req.Join.DevEui = AppSettings.DevEui;
+                mlmeReq.Req.Join.AppEui = AppSettings.AppEui;
+                mlmeReq.Req.Join.AppKey = AppSettings.AppKey;
+                mlmeReq.Req.Join.Datarate = LORAWAN_DEFAULT_DATARATE;
+
+                if( LoRaMacMlmeRequest( &mlmeReq ) == LORAMAC_STATUS_OK )
+                {
+                    DeviceState = DEVICE_STATE_SLEEP;
+                }
+                else
+                {
+                    DeviceState = DEVICE_STATE_CYCLE;
+                }
             }
             break;
         }
@@ -728,6 +787,25 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
     }
     NextTx = true;
     LoRaMacUplinkStatus.StatusUpdated = true;
+}
+
+/*!
+ * \brief   MLME-Indication event function
+ *
+ * \param   [IN] mlmeIndication - Pointer to the indication structure.
+ */
+static void MlmeIndication( MlmeIndication_t *mlmeIndication )
+{
+    switch( mlmeIndication->MlmeIndication )
+    {
+        case MLME_SCHEDULE_UPLINK:
+        {// The MAC signals that we shall provide an uplink as soon as possible
+            OnTxNextPacketTimerEvent( );
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 /**
@@ -756,7 +834,7 @@ int main( void )
 #endif
     AppSettings.Otaa = OVER_THE_AIR_ACTIVATION;
     IsTxConfirmed = AppSettings.IsTxConfirmed = LORAWAN_CONFIRMED_MSG_ON;
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
     AppSettings.DutyCycleOn = LORAWAN_DUTYCYCLE_ON;
 #endif
     AppSettings.DeviceClass = CLASS_C;
@@ -764,7 +842,7 @@ int main( void )
     LoRaMacUplinkStatus.Acked = false;
     LoRaMacUplinkStatus.NbTrials = 0;
     LoRaMacUplinkStatus.Datarate = LORAWAN_DEFAULT_DATARATE;
-    LoRaMacUplinkStatus.TxPower = LORAMAC_DEFAULT_TX_POWER;
+    LoRaMacUplinkStatus.TxPower = TX_POWER_0;
     LoRaMacUplinkStatus.UplinkCounter = 0;
 
     LoRaMacDownlinkStatus.DownlinkCounter = 0;
@@ -791,8 +869,9 @@ int main( void )
                 LoRaMacPrimitives.MacMcpsConfirm = McpsConfirm;
                 LoRaMacPrimitives.MacMcpsIndication = McpsIndication;
                 LoRaMacPrimitives.MacMlmeConfirm = MlmeConfirm;
+                LoRaMacPrimitives.MacMlmeIndication = MlmeIndication;
                 LoRaMacCallbacks.GetBatteryLevel = BoardGetBatteryLevel;
-                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks );
+                LoRaMacInitialization( &LoRaMacPrimitives, &LoRaMacCallbacks, ACTIVE_REGION );
 
                 TimerInit( &TxNextPacketTimer, OnTxNextPacketTimerEvent );
 
@@ -810,27 +889,8 @@ int main( void )
                 mibReq.Param.EnablePublicNetwork = LORAWAN_PUBLIC_NETWORK;
                 LoRaMacMibSetRequestConfirm( &mibReq );
 
-#if defined( USE_BAND_868 )
+#if defined( REGION_EU868 )
                 LoRaMacTestSetDutyCycleOn( AppSettings.DutyCycleOn );
-
-#if( USE_SEMTECH_DEFAULT_CHANNEL_LINEUP == 1 )
-                LoRaMacChannelAdd( 3, ( ChannelParams_t )LC4 );
-                LoRaMacChannelAdd( 4, ( ChannelParams_t )LC5 );
-                LoRaMacChannelAdd( 5, ( ChannelParams_t )LC6 );
-                LoRaMacChannelAdd( 6, ( ChannelParams_t )LC7 );
-                LoRaMacChannelAdd( 7, ( ChannelParams_t )LC8 );
-                LoRaMacChannelAdd( 8, ( ChannelParams_t )LC9 );
-                LoRaMacChannelAdd( 9, ( ChannelParams_t )LC10 );
-
-                mibReq.Type = MIB_RX2_DEFAULT_CHANNEL;
-                mibReq.Param.Rx2DefaultChannel = ( Rx2ChannelParams_t ){ 869525000, DR_3 };
-                LoRaMacMibSetRequestConfirm( &mibReq );
-
-                mibReq.Type = MIB_RX2_CHANNEL;
-                mibReq.Param.Rx2Channel = ( Rx2ChannelParams_t ){ 869525000, DR_3 };
-                LoRaMacMibSetRequestConfirm( &mibReq );
-#endif
-
 #endif
                 mibReq.Type = MIB_DEVICE_CLASS;
                 AppSettings.DeviceClass = mibReq.Param.Class = CLASS_C;
@@ -856,13 +916,16 @@ int main( void )
                 mlmeReq.Req.Join.DevEui = AppSettings.DevEui;
                 mlmeReq.Req.Join.AppEui = AppSettings.AppEui;
                 mlmeReq.Req.Join.AppKey = AppSettings.AppKey;
-                mlmeReq.Req.Join.NbTrials = 3;
+                mlmeReq.Req.Join.Datarate = LORAWAN_DEFAULT_DATARATE;
 
-                if( NextTx == true )
+                if( LoRaMacMlmeRequest( &mlmeReq ) == LORAMAC_STATUS_OK )
                 {
-                    LoRaMacMlmeRequest( &mlmeReq );
+                    DeviceState = DEVICE_STATE_SLEEP;
                 }
-                DeviceState = DEVICE_STATE_SLEEP;
+                else
+                {
+                    DeviceState = DEVICE_STATE_CYCLE;
+                }
 #else
                 // Choose a random device address if not already defined in Commissioning.h
                 if( AppSettings.DevAddr == 0 )

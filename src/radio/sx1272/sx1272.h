@@ -1,20 +1,33 @@
-/*
- / _____)             _              | |
-( (____  _____ ____ _| |_ _____  ____| |__
- \____ \| ___ |    (_   _) ___ |/ ___)  _ \
- _____) ) ____| | | || |_| ____( (___| | | |
-(______/|_____)_|_|_| \__)_____)\____)_| |_|
-    (C)2013 Semtech
-
-Description: Generic SX1272 driver implementation
-
-License: Revised BSD License, see LICENSE.TXT file include in the project
-
-Maintainer: Miguel Luis and Gregory Cristian
-*/
+/*!
+ * \file      sx1272.h
+ *
+ * \brief     SX1272 driver implementation
+ *
+ * \copyright Revised BSD License, see section \ref LICENSE.
+ *
+ * \code
+ *                ______                              _
+ *               / _____)             _              | |
+ *              ( (____  _____ ____ _| |_ _____  ____| |__
+ *               \____ \| ___ |    (_   _) ___ |/ ___)  _ \
+ *               _____) ) ____| | | || |_| ____( (___| | | |
+ *              (______/|_____)_|_|_| \__)_____)\____)_| |_|
+ *              (C)2013-2017 Semtech
+ *
+ * \endcode
+ *
+ * \author    Miguel Luis ( Semtech )
+ *
+ * \author    Gregory Cristian ( Semtech )
+ */
 #ifndef __SX1272_H__
 #define __SX1272_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+#include "gpio.h"
+#include "spi.h"
+#include "radio.h"
 #include "sx1272Regs-Fsk.h"
 #include "sx1272Regs-LoRa.h"
 
@@ -179,15 +192,16 @@ void SX1272SetModem( RadioModems_t modem );
 void SX1272SetChannel( uint32_t freq );
 
 /*!
- * \brief Sets the channels configuration
+ * \brief Checks if the channel is free for the given time
  *
  * \param [IN] modem      Radio modem to be used [0: FSK, 1: LoRa]
  * \param [IN] freq       Channel RF frequency
  * \param [IN] rssiThresh RSSI threshold
+ * \param [IN] maxCarrierSenseTime Max time while the RSSI is measured
  *
  * \retval isFree         [true: Channel is free, false: Channel is not free]
  */
-bool SX1272IsChannelFree( RadioModems_t modem, uint32_t freq, int16_t rssiThresh );
+bool SX1272IsChannelFree( RadioModems_t modem, uint32_t freq, int16_t rssiThresh, uint32_t maxCarrierSenseTime );
 
 /*!
  * \brief Generates a 32 bits random value based on the RSSI readings
@@ -228,10 +242,10 @@ uint32_t SX1272Random( void );
  * \param [IN] fixLen       Fixed length packets [0: variable, 1: fixed]
  * \param [IN] payloadLen   Sets payload length when fixed length is used
  * \param [IN] crcOn        Enables/Disables the CRC [0: OFF, 1: ON]
- * \param [IN] FreqHopOn    Enables disables the intra-packet frequency hopping
+ * \param [IN] freqHopOn    Enables disables the intra-packet frequency hopping
  *                          FSK : N/A ( set to 0 )
  *                          LoRa: [0: OFF, 1: ON]
- * \param [IN] HopPeriod    Number of symbols between each hop
+ * \param [IN] hopPeriod    Number of symbols between each hop
  *                          FSK : N/A ( set to 0 )
  *                          LoRa: Number of symbols
  * \param [IN] iqInverted   Inverts IQ signals (LoRa only)
@@ -245,7 +259,7 @@ void SX1272SetRxConfig( RadioModems_t modem, uint32_t bandwidth,
                          uint32_t bandwidthAfc, uint16_t preambleLen,
                          uint16_t symbTimeout, bool fixLen,
                          uint8_t payloadLen,
-                         bool crcOn, bool FreqHopOn, uint8_t HopPeriod,
+                         bool crcOn, bool freqHopOn, uint8_t hopPeriod,
                          bool iqInverted, bool rxContinuous );
 
 /*!
@@ -272,10 +286,10 @@ void SX1272SetRxConfig( RadioModems_t modem, uint32_t bandwidth,
  *                          LoRa: Length in symbols (the hardware adds 4 more symbols)
  * \param [IN] fixLen       Fixed length packets [0: variable, 1: fixed]
  * \param [IN] crcOn        Enables disables the CRC [0: OFF, 1: ON]
- * \param [IN] FreqHopOn    Enables disables the intra-packet frequency hopping
+ * \param [IN] freqHopOn    Enables disables the intra-packet frequency hopping
  *                          FSK : N/A ( set to 0 )
  *                          LoRa: [0: OFF, 1: ON]
- * \param [IN] HopPeriod    Number of symbols between each hop
+ * \param [IN] hopPeriod    Number of symbols between each hop
  *                          FSK : N/A ( set to 0 )
  *                          LoRa: Number of symbols
  * \param [IN] iqInverted   Inverts IQ signals (LoRa only)
@@ -286,8 +300,8 @@ void SX1272SetRxConfig( RadioModems_t modem, uint32_t bandwidth,
 void SX1272SetTxConfig( RadioModems_t modem, int8_t power, uint32_t fdev,
                         uint32_t bandwidth, uint32_t datarate,
                         uint8_t coderate, uint16_t preambleLen,
-                        bool fixLen, bool crcOn, bool FreqHopOn,
-                        uint8_t HopPeriod, bool iqInverted, uint32_t timeout );
+                        bool fixLen, bool crcOn, bool freqHopOn,
+                        uint8_t hopPeriod, bool iqInverted, uint32_t timeout );
 
 /*!
  * \brief Computes the packet time on air in ms for the given payload
@@ -353,7 +367,7 @@ int16_t SX1272ReadRssi( RadioModems_t modem );
  * \param [IN]: addr Register address
  * \param [IN]: data New register value
  */
-void SX1272Write( uint8_t addr, uint8_t data );
+void SX1272Write( uint16_t addr, uint8_t data );
 
 /*!
  * \brief Reads the radio register at the specified address
@@ -361,7 +375,7 @@ void SX1272Write( uint8_t addr, uint8_t data );
  * \param [IN]: addr Register address
  * \retval data Register value
  */
-uint8_t SX1272Read( uint8_t addr );
+uint8_t SX1272Read( uint16_t addr );
 
 /*!
  * \brief Writes multiple radio registers starting at address
@@ -370,7 +384,7 @@ uint8_t SX1272Read( uint8_t addr );
  * \param [IN] buffer Buffer containing the new register's values
  * \param [IN] size   Number of registers to be written
  */
-void SX1272WriteBuffer( uint8_t addr, uint8_t *buffer, uint8_t size );
+void SX1272WriteBuffer( uint16_t addr, uint8_t *buffer, uint8_t size );
 
 /*!
  * \brief Reads multiple radio registers starting at address
@@ -379,7 +393,7 @@ void SX1272WriteBuffer( uint8_t addr, uint8_t *buffer, uint8_t size );
  * \param [OUT] buffer Buffer where to copy the registers data
  * \param [IN] size Number of registers to be read
  */
-void SX1272ReadBuffer( uint8_t addr, uint8_t *buffer, uint8_t size );
+void SX1272ReadBuffer( uint16_t addr, uint8_t *buffer, uint8_t size );
 
 /*!
  * \brief Sets the maximum payload length.
@@ -397,5 +411,12 @@ void SX1272SetMaxPayloadLength( RadioModems_t modem, uint8_t max );
  * \param [IN] enable if true, it enables a public network
  */
 void SX1272SetPublicNetwork( bool enable );
+
+/*!
+ * \brief Gets the time required for the board plus radio to get out of sleep.[ms]
+ *
+ * \retval time Radio plus board wakeup time in ms.
+ */
+uint32_t SX1272GetWakeupTime( void );
 
 #endif // __SX1272_H__

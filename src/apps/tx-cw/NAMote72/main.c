@@ -1,26 +1,60 @@
-/*
- / _____)             _              | |
-( (____  _____ ____ _| |_ _____  ____| |__
- \____ \| ___ |    (_   _) ___ |/ ___)  _ \
- _____) ) ____| | | || |_| ____( (___| | | |
-(______/|_____)_|_|_| \__)_____)\____)_| |_|
-    (C)2013 Semtech
-
-Description: Tx Continuous Wave implementation
-
-License: Revised BSD License, see LICENSE.TXT file include in the project
-
-Maintainer: Miguel Luis and Gregory Cristian
-*/
-#include <string.h>
+/*!
+ * \file      main.c
+ *
+ * \brief     Tx Continuous Wave implementation
+ *
+ * \copyright Revised BSD License, see section \ref LICENSE.
+ *
+ * \code
+ *                ______                              _
+ *               / _____)             _              | |
+ *              ( (____  _____ ____ _| |_ _____  ____| |__
+ *               \____ \| ___ |    (_   _) ___ |/ ___)  _ \
+ *               _____) ) ____| | | || |_| ____( (___| | | |
+ *              (______/|_____)_|_|_| \__)_____)\____)_| |_|
+ *              (C)2013-2017 Semtech
+ *
+ * \endcode
+ *
+ * \author    Miguel Luis ( Semtech )
+ *
+ * \author    Gregory Cristian ( Semtech )
+ */
+#include "board-config.h"
 #include "board.h"
+#include "gpio.h"
+#include "timer.h"
 #include "radio.h"
 
-#if defined( USE_BAND_868 )
+#if defined( REGION_AS923 )
+
+#define RF_FREQUENCY                                923000000 // Hz
+
+#elif defined( REGION_AU915 )
+
+#define RF_FREQUENCY                                915000000 // Hz
+
+#elif defined( REGION_CN779 )
+
+#define RF_FREQUENCY                                779000000 // Hz
+
+#elif defined( REGION_EU868 )
 
 #define RF_FREQUENCY                                868000000 // Hz
 
-#elif defined( USE_BAND_915 )
+#elif defined( REGION_KR920 )
+
+#define RF_FREQUENCY                                920000000 // Hz
+
+#elif defined( REGION_IN865 )
+
+#define RF_FREQUENCY                                865000000 // Hz
+
+#elif defined( REGION_US915 )
+
+#define RF_FREQUENCY                                915000000 // Hz
+
+#elif defined( REGION_US915_HYBRID )
 
 #define RF_FREQUENCY                                915000000 // Hz
 
@@ -46,6 +80,13 @@ volatile bool Led3TimerEvent = false;
  * Radio events function pointer
  */
 static RadioEvents_t RadioEvents;
+
+/*!
+ * LED GPIO pins objects
+ */
+extern Gpio_t Led1;
+extern Gpio_t Led2;
+extern Gpio_t Led3;
 
 /*!
  * \brief Function executed on Led 1 Timeout event
